@@ -12,6 +12,10 @@ import com.HelpdeskDemo.app.service.OtpService;
 import com.HelpdeskDemo.app.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -20,13 +24,22 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl implements UserService, UserDetailsService {
 
     private final UserRepository userRepository;
     private final EmployeeEmailRepository employeeEmailRepository;
     private final ModelMapper modelMapper;
     private final OtpService otpService;
     private final UserVerificationRepository userVerificationRepository;
+    private final PasswordEncoder passwordEncoder;
+
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        return userRepository.findByEmail(username).orElseThrow(
+                () -> new RuntimeException()
+        );
+    }
 
     @Override
     public UserDto initiateRegistration(SignUpDto signUpDto) {
@@ -35,6 +48,7 @@ public class UserServiceImpl implements UserService {
         checkIfAlreadyUserRegistered(signUpDto.getEmail()); // step2: to check if the User is already registered.
         User userEntity = modelMapper.map(signUpDto, User.class);
         userEntity.setUserVerified(false);
+        userEntity.setPassword(passwordEncoder.encode(signUpDto.getPassword()));
         User savedUser = userRepository.save(userEntity);
         //sending the otp
         otpService.generateAndSendOTP(signUpDto.getEmail());
@@ -74,4 +88,6 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("User with this email :" + email + " already register...!");
         }
     }
+
+
 }
